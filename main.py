@@ -10,6 +10,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_absolute_percentage_error
 
 import xgboost as xgb
+import json
 
 #-----------------------------------------
 #----------------- SETUP -----------------
@@ -76,7 +77,8 @@ df['province'] = df["province"].replace(province)
 #----------- Columns Drop ----------------
 #-----------------------------------------
 
-del_cols = ['Unnamed: 0', 'url', 'hasBalcony', 'accessibleDisabledPeople', 'monthlyCost',] # empty
+del_cols = ['Unnamed: 0', 'url', 'hasBalcony',     'locality',
+            'accessibleDisabledPeople', 'monthlyCost',] # empty
 df = df.drop(del_cols, axis=1)
 
 #-----------------------------------------
@@ -99,7 +101,6 @@ df = df.dropna(subset=['habitableSurface'])
 #-----------------------------------------
 
 str_cols = [
-    'locality',
     'terraceOrientation', 
     'epcScore', 
     'gardenOrientation', 
@@ -112,11 +113,20 @@ str_cols = [
     ]
 
 def col_str_to_int(df, col):
-    numbers, _ = pd.factorize(df[col])
-    return numbers + 1
+    numbers, label = pd.factorize(df[col])
+    return numbers + 1, list(label)
+
+labels = {}
 
 for col in str_cols:
-    df[col] = col_str_to_int(df, col) 
+    df[col], labels[col] = col_str_to_int(df, col) 
+
+#-----------------------------------------
+#----------- label into json -------------
+#-----------------------------------------
+
+with open("model-label.json", "w", encoding="utf-8") as f:
+    json.dump(labels, f, ensure_ascii=False, indent=2)
 
 #-----------------------------------------
 #--------- % for price range -------------
@@ -168,7 +178,7 @@ df[obj_cols] = df[obj_cols].astype(int)
 #-----------------------------------------
 
 pandas_csv = os.path.join(current_dir, "data", "model.csv")
-df.to_csv(pandas_csv, index=True, sep=',', encoding="utf-8")
+df.to_csv(pandas_csv, index=False, sep=',', encoding="utf-8")
 
 #-----------------------------------------
 #----------- Split Dataset ---------------
@@ -177,7 +187,8 @@ df.to_csv(pandas_csv, index=True, sep=',', encoding="utf-8")
 X = df.drop(columns=['price'])
 y = df['price']
 
-immo_train, immo_test, price_train, price_test = train_test_split(X, y, test_size=0.05, random_state=42)
+immo_train, immo_test, price_train, price_test \
+    = train_test_split(X, y, test_size=0.05, random_state=42)
 
 #-----------------------------------------
 #--------------- XG Boost ---------------- 
@@ -201,6 +212,7 @@ model = xgb.XGBRegressor(
 #------- Cross-Validation Evaluation -----
 #-----------------------------------------
 
+""" 
 print('')
 
 cv_scores = -cross_val_score(
@@ -211,7 +223,7 @@ cv_scores = -cross_val_score(
     n_jobs=-1
 )
 print(f"3-fold CV MAE: {cv_scores.mean():,.2f} ± {cv_scores.std():.2f}") 
-   
+"""
 
 model.fit(immo_train, price_train)
 
